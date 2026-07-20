@@ -3,7 +3,6 @@ import { AppError } from "@/utils/app-error";
 import { Request, Response, NextFunction } from "express";
 import z from "zod";
 
-
 class ProductsController {
   async index(request: Request, response: Response, next: NextFunction) {
     try{
@@ -11,8 +10,8 @@ class ProductsController {
       const { name } = request.query
 
       const products = await knex<ProductsController>("products")
-      .whereLike("name", `%${name ?? ""}%`)
-      .select("*")
+        .whereLike("name", `%${name ?? ""}%`)
+        .select()
 
       return response.json(products)
 
@@ -55,9 +54,18 @@ class ProductsController {
       const { name, price } = bodySchema.parse(request.body)
       const { id } = bodySchemaParams.parse(request.params)
 
+      const product = await knex<ProductRepository>("products")
+        .select()
+        .where({ id })
+        .first()
+
+      if(!product) {
+        throw new AppError("Product not found!")
+      }
+
       await knex<ProductRepository>("products")
             .update({ name, price, updated_at: knex.fn.now() })
-            .where({ id: id })
+            .where({ id })
 
       return response.status(200).json()
 
@@ -68,15 +76,24 @@ class ProductsController {
 
   async remove(request: Request, response: Response, next: NextFunction) {
     try {
-      const bodySchemaParams = z.object({
-        id: z.string()
-        .transform((value) => Number(value))
-        .refine((value) => !isNaN(value), { message: "id must be a number" })
-      })
+      const id = z
+      .string()
+      .transform((value) => Number(value))
+      .refine((value) => !isNaN(value), { message: "id must be a number" })
+      .parse(request.params.id)
 
-      const { id } = bodySchemaParams.parse(request.params)
+      const product = await knex<ProductRepository>("products")
+        .select()
+        .where({ id })
+        .first()
 
-      await knex<ProductRepository>("products").delete().where({ id: id })
+      if(!product){
+        throw new AppError("Product not found!")
+      }
+    
+      await knex<ProductRepository>("products")
+        .delete()
+        .where({ id })
 
       return response.status(200).json()
 
