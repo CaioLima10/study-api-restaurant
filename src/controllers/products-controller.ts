@@ -1,4 +1,5 @@
 import { knex } from "@/database/knex";
+import { AppError } from "@/utils/app-error";
 import { Request, Response, NextFunction } from "express";
 import z from "zod";
 
@@ -46,13 +47,36 @@ class ProductsController {
       })
       
       const bodySchemaParams = z.object({
-        id: z.string(),
+        id: z.string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "id must be a number" })
       })
 
       const { name, price } = bodySchema.parse(request.body)
       const { id } = bodySchemaParams.parse(request.params)
 
-      await knex<ProductRepository>("products").update({ name, price }).where({ id: id })
+      await knex<ProductRepository>("products")
+            .update({ name, price, updated_at: knex.fn.now() })
+            .where({ id: id })
+
+      return response.status(200).json()
+
+    } catch (error) {
+      next(error)
+    }
+  }
+
+  async remove(request: Request, response: Response, next: NextFunction) {
+    try {
+      const bodySchemaParams = z.object({
+        id: z.string()
+        .transform((value) => Number(value))
+        .refine((value) => !isNaN(value), { message: "id must be a number" })
+      })
+
+      const { id } = bodySchemaParams.parse(request.params)
+
+      await knex<ProductRepository>("products").delete().where({ id: id })
 
       return response.status(200).json()
 
